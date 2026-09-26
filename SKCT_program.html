@@ -86,6 +86,20 @@ button{font:inherit;cursor:pointer;background:#fff;border:1px solid #111;border-
 .answer-panel{width:min(94vw,390px);height:min(94vh,860px);background:#fff;border:1px solid #111;border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
 .answer-head{padding:12px;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .answer-head h2{font-size:17px;margin:0}
+.answer-panel{height:auto !important;max-height:94vh}
+#keyTyping{padding:10px 12px;overflow-y:auto;flex:1}
+.kt-help{font-size:11px;color:#666;margin-bottom:8px;line-height:1.5}
+.kt-row{border:1px solid #ddd;border-radius:10px;padding:8px 10px;margin-bottom:8px}
+.kt-row.active{border-color:#111;box-shadow:0 1px 6px #0002}
+.kt-row.done{border-color:#17823b}
+.kt-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.kt-name{font-weight:800;font-size:14px;background:none;border:0;padding:0}
+.kt-count{font-size:12px;font-weight:700;color:#888}
+.kt-row.done .kt-count{color:#17823b}
+.kt-input{width:100%;height:38px;border:1px solid #bbb;border-radius:6px;padding:0 10px;font:700 18px Consolas,"Courier New",monospace;letter-spacing:3px;outline:none}
+.kt-input:focus{border-color:#111}
+.kt-preview{margin-top:6px;font:700 14px Consolas,"Courier New",monospace;letter-spacing:2px;color:#111;display:flex;gap:12px;flex-wrap:wrap}
+.kt-preview .grp-empty{color:#ccc}
 .answer-subject-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:8px;border-bottom:1px solid #ddd}
 .answer-subject-tab{height:32px;font-size:10px;font-weight:700;padding:0 2px}
 .answer-subject-tab.active{background:#171717;color:#fff}
@@ -1160,12 +1174,13 @@ body.omr-collapsed .tool-header .tabs{
       <h2 id="answerModalTitle">정답 입력 · 언어이해</h2>
       <button id="closeAnswerModal">닫기</button>
     </div>
-    <div class="answer-subject-tabs" id="answerSubjectTabs"></div>
-    <div id="answerSheet"></div>
+    <div class="answer-subject-tabs" id="answerSubjectTabs" style="display:none"></div>
+    <div id="answerSheet" style="display:none"></div>
+    <div id="keyTyping"></div>
     <div class="answer-modal-foot">
       <div class="answer-status" id="answerStatus">실제 정답을 체크하세요.</div>
       <div class="answer-actions">
-        <button id="clearAnswerSubject">현재 영역 Reset</button>
+        <button id="clearAnswerSubject">현재 과목 지우기</button>
         <button id="gradeFromModal">정답 제출 및 채점</button>
       </div>
     </div>
@@ -1571,6 +1586,8 @@ function openAnswerModal(subject){
   document.querySelectorAll('.answer-subject-tab').forEach(b=>b.classList.toggle('active',b.textContent===answerActiveSubject));
   renderAnswerKey();
   answerModal.classList.add('open');
+  const first=subjects.findIndex(s=>!answerKeys[s].every(Boolean));
+  setTimeout(()=>ktInputs[first<0?0:first].focus(),0);
 }
 function switchAnswerSubject(name,button){
   answerActiveSubject=name; answerCurrent=0;
@@ -1586,7 +1603,43 @@ function selectAnswerKey(q,c){
   answerCurrent=same?q:Math.min(q+1,N-1);
   renderAnswerKey();
 }
+// 과목별로 정답을 숫자로 한 번에 타이핑 (예: 12134513245421314521)
+const keyTyping=document.getElementById('keyTyping');
+keyTyping.innerHTML='<div class="kt-help">과목 이름을 누르고 정답 20개를 숫자로 이어서 입력하세요. (1~5만 입력, 띄어쓰기 무시)<br>20개를 채우면 다음 과목으로 자동 이동하고, Enter로도 넘어갈 수 있어요.</div>'+
+  subjects.map((s,i)=>`<div class="kt-row" data-s="${s}"><div class="kt-top"><button class="kt-name">${s}</button><span class="kt-count"></span></div>
+  <input class="kt-input" data-i="${i}" inputmode="numeric" autocomplete="off" placeholder="정답 20개 숫자 입력"></div>`).join('');
+const ktInputs=[...keyTyping.querySelectorAll('.kt-input')];
+function ktKeyString(s){ return answerKeys[s].map(v=>v||'').join(''); }
+function ktRender(){
+  keyTyping.querySelectorAll('.kt-row').forEach((row,i)=>{
+    const s=subjects[i], arr=answerKeys[s], n=arr.filter(Boolean).length;
+    row.classList.toggle('active',s===answerActiveSubject);
+    row.classList.toggle('done',n===N);
+    row.querySelector('.kt-count').textContent=`${n} / ${N}${n===N?' ✓':''}`;
+    const inp=row.querySelector('.kt-input');
+    if(document.activeElement!==inp){ const v=arr.every((x,j)=>j>=n||x)?ktKeyString(s):arr.map(x=>x||'?').join(''); inp.value=v.replace(/(.{5})(?=.)/g,'$1 '); }
+  });
+}
+ktInputs.forEach((inp,i)=>{
+  const s=subjects[i];
+  inp.addEventListener('focus',()=>{ answerActiveSubject=s; renderAnswerKey(); });
+  inp.addEventListener('input',()=>{
+    const digits=inp.value.replace(/[^1-5]/g,'').slice(0,N);
+    const formatted=digits.replace(/(.{5})(?=.)/g,'$1 ');
+    if(inp.value!==formatted) inp.value=formatted;
+    answerKeys[s].fill(null);
+    [...digits].forEach((d,j)=>answerKeys[s][j]=+d);
+    renderAnswerKey(); updateKeyEntryBtn();
+    if(digits.length===N && i<ktInputs.length-1) ktInputs[i+1].focus();
+  });
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){ e.preventDefault(); if(i<ktInputs.length-1) ktInputs[i+1].focus(); else document.getElementById('gradeFromModal').focus(); }
+  });
+});
+keyTyping.querySelectorAll('.kt-name').forEach((b,i)=>b.onclick=()=>ktInputs[i].focus());
+
 function renderAnswerKey(){
+  ktRender();
   const arr=answerKeys[answerActiveSubject];
   answerModalTitle.textContent='정답 입력 · '+answerActiveSubject;
   [...answerSheet.children].forEach((row,q)=>{
@@ -1596,7 +1649,8 @@ function renderAnswerKey(){
   answerStatus.textContent=`${answerActiveSubject} 정답: ${done} / 20 · 전체 정답을 입력한 뒤 채점하세요.`;
 }
 document.getElementById('clearAnswerSubject').onclick=()=>{
-  answerKeys[answerActiveSubject].fill(null); answerCurrent=0; renderAnswerKey();
+  answerKeys[answerActiveSubject].fill(null); answerCurrent=0;
+  const inp=ktInputs[subjects.indexOf(answerActiveSubject)]; inp.value=''; renderAnswerKey(); updateKeyEntryBtn(); inp.focus();
 };
 document.getElementById('closeAnswerModal').onclick=()=>{
   answerModal.classList.remove('open');
@@ -1607,6 +1661,7 @@ document.getElementById('gradeFromModal').onclick=grade;
 // 정답 창이 열려 있을 때 1~5 키는 정답 OMR에 입력
 document.addEventListener('keydown',e=>{
   if(!answerModal.classList.contains('open')) return;
+  if(e.target.classList?.contains('kt-input')) return;
   if(/^[1-5]$/.test(e.key)){
     e.preventDefault(); e.stopImmediatePropagation();
     selectAnswerKey(answerCurrent,+e.key);
@@ -1617,6 +1672,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('keydown',e=>{
  if(document.activeElement===document.getElementById('note')) return;
  if(document.activeElement===document.getElementById('display') || document.activeElement?.closest?.('.calc')) return;
+ if(answerModal.classList.contains('open') || historyModal.classList.contains('open')) return;
  if(mode==='solve' && /^[1-5]$/.test(e.key)) select(current,+e.key);
 });
 
