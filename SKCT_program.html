@@ -1,0 +1,1559 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OMR + 메모/그림판/계산기</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#eef0f2;color:#111;font-family:Arial,"Noto Sans KR",sans-serif}
+.app{display:flex;gap:10px;align-items:flex-start;width:max-content;margin:10px auto;padding:0 8px}
+.card{background:#fff;border:1px solid #111;border-radius:12px;overflow:hidden}
+.omr{width:275px;height:825px;display:flex;flex-direction:column}
+.omr-head{flex:0 0 auto;display:flex;justify-content:space-between;align-items:center;padding:11px 10px;border-bottom:1px solid #ddd}
+.omr-head h1{font-size:17px;margin:0}
+.subject-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:7px 8px;border-bottom:1px solid #ddd}
+.subject-tab{height:30px;font-size:10px;font-weight:700;padding:0 2px;white-space:nowrap}
+.subject-tab.active{background:#171717;color:#fff}
+button{font:inherit;cursor:pointer;background:#fff;border:1px solid #111;border-radius:6px}
+.reset{padding:7px 10px}
+#sheet{padding:6px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;scrollbar-gutter:stable}
+.row{display:grid;grid-template-columns:30px repeat(5,32px);justify-content:center;align-items:center;gap:3px;padding:7px 4px;margin:5px 0;border-radius:8px;box-shadow:0 1px 6px #0002}
+.num{text-align:center;font-weight:700}
+.choice{width:32px;height:34px}
+.choice.selected{background:#111;color:#fff;font-weight:700}
+.omr-foot{flex:0 0 auto;padding:10px;border-top:1px solid #ddd;font-size:13px}
+#answers{margin-top:7px;line-height:1.6;color:#444}
+
+.tools{width:400px;display:flex;flex-direction:column;gap:14px}
+.toolbox{padding:12px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.tab{height:40px;font-weight:700}
+.tab.active{background:#171717;color:#fff}
+.tooltop{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:8px;min-height:34px}
+#note{width:100%;height:255px;border:0;outline:0;resize:none;padding:4px;font:15px Arial}
+#drawWrap{display:none}
+.draw-controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px;font-size:13px}
+#canvas{display:block;width:100%;height:255px;border-top:1px solid #eee;touch-action:none;background:#fff}
+.clear{padding:7px 10px}
+
+.calc{padding:12px}
+.calc-title{font-size:14px;margin:3px 0 10px}
+#display{width:100%;height:56px;border:1px solid #d9e0e7;border-radius:6px;background:#f7f9fb;text-align:right;padding:8px 12px;font-size:24px;margin-bottom:6px}
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.key{height:48px;border-color:#d9e0e7;font-size:16px}
+.zero{grid-column:span 2}
+@media(max-width:720px){.app{margin-left:0}.tools{width:360px}}
+
+.timerbar{
+  width:100%;background:#fff;border:1px solid #111;border-radius:12px;
+  padding:10px 12px;display:flex;align-items:center;justify-content:center;
+  gap:10px;margin-bottom:10px
+}
+.timer-label{font-weight:700}
+#timerDisplay{font-size:24px;font-weight:700;min-width:72px;text-align:center;font-variant-numeric:tabular-nums}
+.timerbtn{padding:7px 11px}
+#alarmMsg{font-size:13px;font-weight:700;display:none}
+.submit-wrap{padding:8px 10px;border-top:1px solid #ddd;display:flex;gap:7px}
+.submit-btn{flex:1;padding:9px 6px;font-weight:700;background:#171717;color:#fff}
+.cancel-grade-btn{padding:9px 8px}
+.grading-title{font-size:13px;font-weight:700;margin:0 0 6px}
+.grading-help{font-size:11px;color:#555;margin-bottom:5px}
+.row.correct{outline:2px solid #17823b;background:#eefaf1}
+.row.wrong{outline:2px solid #c62828;background:#fff1f1}
+.row.unanswered{outline:2px solid #e59a00;background:#fff9e8}
+.choice.answer-key{box-shadow:inset 0 0 0 2px #17823b}
+#gradeResult{padding:8px 10px;border-top:1px solid #ddd;font-size:12px;line-height:1.55;display:none}
+#gradeResult b{font-size:14px}
+
+.answer-modal{position:fixed;inset:0;background:#0008;z-index:9999;display:none;align-items:center;justify-content:center;padding:12px}
+.answer-modal.open{display:flex}
+.answer-panel{width:min(94vw,390px);height:min(94vh,860px);background:#fff;border:1px solid #111;border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+.answer-head{padding:12px;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.answer-head h2{font-size:17px;margin:0}
+.answer-subject-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:8px;border-bottom:1px solid #ddd}
+.answer-subject-tab{height:32px;font-size:10px;font-weight:700;padding:0 2px}
+.answer-subject-tab.active{background:#171717;color:#fff}
+#answerSheet{padding:6px;overflow:auto;flex:1}
+.answer-row{display:grid;grid-template-columns:30px repeat(5,32px);justify-content:center;align-items:center;gap:3px;padding:7px 4px;margin:5px 0;border-radius:8px;box-shadow:0 1px 6px #0002}
+.answer-choice{width:32px;height:34px}
+.answer-choice.selected{background:#111;color:#fff;font-weight:700}
+.answer-modal-foot{padding:10px;border-top:1px solid #ddd}
+.answer-status{font-size:12px;line-height:1.5;margin-bottom:8px;color:#444}
+.answer-actions{display:flex;gap:7px}
+.answer-actions button{padding:10px 8px;font-weight:700}
+#gradeFromModal{flex:1;background:#171717;color:#fff}
+
+/* OMR 접힘 전용 슬림 모드 */
+body.omr-collapsed .app{
+  width:100%;
+  max-width:430px;
+  margin:8px auto;
+  padding:0 8px;
+  display:block;
+}
+body.omr-collapsed .tools{
+  width:100%;
+  gap:10px;
+}
+body.omr-collapsed > div:first-of-type{
+  width:100% !important;
+  max-width:430px;
+  margin:8px auto 0 !important;
+  padding:0 8px !important;
+}
+body.omr-collapsed .timerbar{
+  width:100%;
+  padding:8px;
+  gap:6px;
+  justify-content:space-between;
+  flex-wrap:wrap;
+}
+body.omr-collapsed .timer-label{display:none}
+body.omr-collapsed #timerDisplay{
+  font-size:24px;
+  min-width:70px;
+}
+body.omr-collapsed .timerbtn{
+  padding:7px 8px;
+  white-space:nowrap;
+}
+body.omr-collapsed #slimShowOMR{
+  display:inline-block !important;
+}
+body.omr-collapsed .toolbox,
+body.omr-collapsed .calc{
+  width:100%;
+}
+body.omr-collapsed #note{
+  height:260px;
+}
+body.omr-collapsed #canvas{
+  height:260px;
+}
+body.omr-collapsed #showOMRFloating{
+  display:none !important;
+}
+body.omr-collapsed #alarmMsg{
+  width:100%;
+  text-align:center;
+}
+
+#slimShowOMR{display:none}
+
+@media(max-width:470px){
+  body.omr-collapsed .timerbar{
+    display:grid;
+    grid-template-columns:72px 1fr 1fr 1fr;
+    align-items:center;
+  }
+  body.omr-collapsed #timerDisplay{grid-column:1}
+  body.omr-collapsed #timerStart{grid-column:2}
+  body.omr-collapsed #timerPause{grid-column:3}
+  body.omr-collapsed #timerReset{grid-column:4}
+  body.omr-collapsed #slimShowOMR{
+    grid-column:1 / -1;
+    width:100%;
+  }
+  body.omr-collapsed #alarmMsg{grid-column:1 / -1}
+}
+
+
+.omr-head-actions{display:flex;align-items:stretch;justify-content:flex-end;gap:5px;margin-left:6px}
+.area-reset{min-width:82px;padding:4px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05;font-size:11px;font-weight:700}
+.area-reset span:last-child{font-size:13px;margin-top:3px}
+.omr-hide-btn{min-width:62px;padding:4px 5px;font-size:10px;font-weight:700;white-space:nowrap}
+
+/* 접힌 상태: 시험지 옆에 두기 좋은 초컴팩트 상단바 */
+body.omr-collapsed > div:first-of-type{
+  width:100% !important;
+  max-width:430px;
+  margin:6px auto 0 !important;
+  padding:0 6px !important;
+}
+body.omr-collapsed .timerbar{
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  align-items:center;
+  justify-content:flex-start;
+  width:100%;
+  min-height:44px;
+  margin:0;
+  padding:5px 6px;
+  gap:5px;
+  border-radius:9px;
+}
+body.omr-collapsed #timerDisplay{
+  flex:0 0 auto;
+  min-width:65px;
+  font-size:22px;
+  line-height:1;
+  text-align:center;
+}
+body.omr-collapsed .timerbtn{
+  flex:0 0 auto;
+  height:32px;
+  padding:4px 7px;
+  font-size:12px;
+  font-weight:700;
+  border-radius:6px;
+  white-space:nowrap;
+}
+body.omr-collapsed #timerStart{padding-left:8px;padding-right:8px}
+body.omr-collapsed #slimShowOMR{
+  display:inline-block !important;
+  margin-left:auto;
+  width:auto !important;
+}
+body.omr-collapsed #alarmMsg{
+  position:absolute;
+  top:54px;
+  left:50%;
+  transform:translateX(-50%);
+  width:auto;
+  white-space:nowrap;
+  background:#fff;
+  border:1px solid #111;
+  border-radius:6px;
+  padding:4px 7px;
+  z-index:20;
+}
+body.omr-collapsed .app{
+  margin-top:7px;
+}
+
+/* 이전 좁은 화면 grid 배치를 무효화 */
+@media(max-width:470px){
+  body.omr-collapsed .timerbar{
+    display:flex !important;
+    grid-template-columns:none !important;
+  }
+  body.omr-collapsed #timerDisplay,
+  body.omr-collapsed #timerStart,
+  body.omr-collapsed #timerPause,
+  body.omr-collapsed #timerReset,
+  body.omr-collapsed #slimShowOMR,
+  body.omr-collapsed #alarmMsg{
+    grid-column:auto !important;
+  }
+}
+
+
+/* 버튼 타이포그래피 통일 — 기존 레이아웃/크기는 유지 */
+button,
+.timerbtn,
+.reset,
+.subject-tab,
+.tab,
+.clear,
+.key,
+.submit-btn,
+.cancel-grade-btn,
+.answer-subject-tab,
+.answer-choice,
+#closeAnswerModal,
+#clearAnswerSubject,
+#gradeFromModal,
+#slimShowOMR{
+  font-family:Arial,"Noto Sans KR",sans-serif;
+  font-weight:700;
+  letter-spacing:-0.15px;
+}
+
+/* 주요 일반 버튼 */
+.timerbtn,
+.reset,
+.clear,
+#closeAnswerModal,
+#clearAnswerSubject,
+#gradeFromModal{
+  font-size:12px;
+}
+
+/* 탭류 */
+.tab{
+  font-size:13px;
+}
+.subject-tab,
+.answer-subject-tab{
+  font-size:10px;
+}
+
+/* OMR 숫자 선택 버튼 */
+.choice,
+.answer-choice{
+  font-size:13px;
+  font-weight:700;
+}
+
+/* 제출/채점 관련 */
+.submit-btn,
+.cancel-grade-btn{
+  font-size:12px;
+}
+
+/* 계산기는 숫자 가독성을 위해 크기는 기존 수준 유지 */
+.key{
+  font-size:16px;
+  font-weight:700;
+}
+
+/* 상단 OMR 헤더 버튼도 동일한 굵기감 */
+.area-reset,
+.area-reset span,
+.omr-hide-btn{
+  font-weight:700;
+  font-family:Arial,"Noto Sans KR",sans-serif;
+}
+
+/* 접힌 상태에서도 같은 타이포 규칙 */
+body.omr-collapsed .timerbtn,
+body.omr-collapsed #slimShowOMR{
+  font-size:12px;
+  font-weight:700;
+}
+
+
+/* 로고 + 제작자 이메일: 기존 UI 안에 컴팩트하게 통합 */
+.brand-logo{
+  flex:0 0 auto;
+  width:48px;
+  height:32px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding-right:7px;
+  margin-right:1px;
+  border-right:1px solid #d7d7d7;
+}
+.brand-logo img{
+  display:block;
+  max-width:40px;
+  max-height:27px;
+  width:auto;
+  height:auto;
+  object-fit:contain;
+}
+.creator-email{
+  position:fixed;
+  right:10px;
+  bottom:5px;
+  z-index:50;
+  font:700 9px Arial,"Noto Sans KR",sans-serif;
+  color:#777;
+  background:rgba(238,240,242,.88);
+  padding:2px 4px;
+  border-radius:4px;
+  pointer-events:none;
+}
+
+/* 접힌 슬림 모드에서도 로고를 타이머 왼쪽에 유지하되 더 작게 */
+body.omr-collapsed .brand-logo{
+  width:31px;
+  height:27px;
+  padding-right:5px;
+  margin-right:0;
+}
+body.omr-collapsed .brand-logo img{
+  max-width:25px;
+  max-height:22px;
+}
+body.omr-collapsed .creator-email{
+  font-size:8px;
+  right:6px;
+  bottom:3px;
+}
+
+
+/* ===== 참고 사진 기반 도구 영역 디자인 ===== */
+.tools{gap:0}
+.toolbox{
+  padding:10px 12px 8px;
+  border-bottom-left-radius:0;
+  border-bottom-right-radius:0;
+  border-bottom:0;
+}
+.tabs{
+  display:flex;
+  align-items:center;
+  gap:18px;
+  margin:0 0 8px;
+  border-bottom:1px solid #e2e5e9;
+}
+.tab{
+  width:auto;
+  height:32px;
+  padding:0 2px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  color:#777;
+  font-size:12px;
+}
+.tab.active{
+  background:transparent;
+  color:#111;
+  border-bottom:2px solid #111;
+}
+.tooltop{
+  min-height:28px;
+  margin:-35px 0 7px;
+  pointer-events:none;
+}
+.tooltop .clear{
+  pointer-events:auto;
+  padding:5px 10px;
+  border:0;
+  border-radius:14px;
+  background:#3a3a3d;
+  color:#fff;
+  font-size:10px;
+}
+#note{
+  height:250px;
+  padding:8px 4px;
+  border:0;
+  background:#fff;
+  font:13px Arial,"Noto Sans KR",sans-serif;
+}
+.draw-controls{
+  min-height:28px;
+  margin:-35px 0 7px;
+  padding-left:95px;
+  justify-content:flex-end;
+  gap:6px;
+  font-size:10px;
+}
+.draw-controls .clear{
+  padding:5px 10px;
+  border:0;
+  border-radius:14px;
+  background:#3a3a3d;
+  color:#fff;
+  font-size:10px;
+}
+#canvas{
+  height:250px;
+  border:0;
+  background:#fff;
+}
+
+.calc{
+  padding:10px 12px 12px;
+  border-top-left-radius:0;
+  border-top-right-radius:0;
+  border-top:1px solid #e2e5e9;
+}
+.calc-title{
+  margin:0 0 10px;
+  font-size:12px;
+  font-weight:700;
+}
+#display{
+  height:42px;
+  margin-bottom:7px;
+  padding:6px 10px;
+  border:1px solid #e3e6ea;
+  border-radius:3px;
+  background:#fafbfc;
+  font-size:17px;
+}
+.keys{
+  gap:2px;
+  background:#f1f2f4;
+}
+.key{
+  height:39px;
+  border:0;
+  border-radius:2px;
+  background:#f5f6f8;
+  font-size:13px;
+}
+.key:hover{background:#eceef1}
+.key.equal-key{
+  background:#343438;
+  color:#fff;
+}
+.key.equal-key:hover{background:#29292d}
+.zero{grid-column:auto}
+
+/* 접힌 모드에서도 사진 같은 한 패널 느낌 유지 */
+body.omr-collapsed .tools{gap:0}
+body.omr-collapsed .toolbox{border-bottom-left-radius:0;border-bottom-right-radius:0}
+body.omr-collapsed .calc{border-top-left-radius:0;border-top-right-radius:0}
+
+
+/* v8 도구 영역 디테일 */
+.toolbox{padding-bottom:16px}
+.tabs{margin-bottom:16px}
+.tooltop{margin:-43px 0 16px;min-height:30px;align-items:flex-start}
+.draw-controls{
+  margin:-43px 0 16px;
+  padding-left:105px;
+  min-height:30px;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:12px;
+}
+.pen-size-control{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:10px;color:#444}
+.pen-size-control input[type="range"]{width:110px}
+#clearCanvas{flex:0 0 auto}
+
+/* 메모/그림판과 계산기 사이에 참고 이미지처럼 여백 */
+.calc{margin-top:28px;padding-top:15px}
+.calc-title{margin-bottom:8px}
+
+/* 최근 계산 3개 표시 공간 */
+.calc-history{
+  height:66px;
+  margin:0 0 8px;
+  padding:4px 9px;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  gap:2px;
+  overflow:hidden;
+  font-family:Arial,"Noto Sans KR",sans-serif;
+}
+.history-empty{margin:auto 0 3px;text-align:right;font-size:10px;color:#aaa}
+.history-row{min-height:16px;display:flex;justify-content:flex-end;align-items:center;gap:10px;font-size:10px;color:#777;white-space:nowrap}
+.history-row span{overflow:hidden;text-overflow:ellipsis}
+.history-row strong{min-width:50px;text-align:right;font-size:11px;color:#444}
+body.omr-collapsed .calc{margin-top:22px}
+
+
+/* ===== v9 requested alignment fixes ===== */
+
+/* 메모/그림판 + 계산기를 다시 하나의 연속된 카드처럼 연결 */
+.tools{
+  gap:0 !important;
+  border:1px solid #111;
+  border-radius:12px;
+  overflow:hidden;
+  background:#fff;
+}
+.toolbox{
+  border:0 !important;
+  border-radius:0 !important;
+  padding:10px 12px 12px !important;
+}
+.calc{
+  border:0 !important;
+  border-top:1px solid #e1e4e8 !important;
+  border-radius:0 !important;
+  margin-top:0 !important;
+  padding:18px 12px 12px !important;
+}
+
+/* 메모 탭 제목과 전체 지우기 버튼을 같은 높이로 */
+.tabs{
+  height:34px;
+  margin:0 0 10px !important;
+  align-items:flex-start;
+}
+.tab{
+  height:34px;
+  line-height:30px;
+}
+.tooltop{
+  height:34px;
+  min-height:34px !important;
+  margin:-44px 0 10px !important;
+  align-items:flex-start !important;
+}
+.tooltop .clear{
+  margin-top:0 !important;
+}
+
+/* 그림판: 두께 조절과 전체 지우기를 정확히 같은 한 줄에 */
+.draw-controls{
+  height:34px;
+  min-height:34px !important;
+  margin:-44px 0 10px !important;
+  padding-left:165px !important;
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+}
+.pen-size-control{
+  height:28px;
+  display:flex !important;
+  align-items:center !important;
+  gap:5px !important;
+  line-height:28px;
+}
+.pen-size-control input[type="range"]{
+  width:82px !important;
+}
+#clearCanvas{
+  height:28px;
+  margin:0 !important;
+  align-self:flex-start !important;
+}
+
+/* 계산 기록: 첫 기록은 위에서 시작, 새 기록이 아래에 추가되며 기존 기록이 위로 밀림 */
+.calc-history{
+  height:66px;
+  justify-content:flex-start !important;
+  padding-top:4px !important;
+  padding-bottom:4px !important;
+}
+.history-empty{
+  margin:3px 0 0 !important;
+}
+
+
+/* v10 그림판 컨트롤: 두께는 왼쪽, 전체 지우기는 오른쪽 같은 줄 */
+.draw-controls{
+  height:34px !important;
+  min-height:34px !important;
+  margin:-44px 0 10px !important;
+  padding-left:145px !important;
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:space-between !important;
+  gap:6px !important;
+  overflow:visible !important;
+}
+.pen-size-control{
+  height:28px !important;
+  margin:0 !important;
+  display:flex !important;
+  align-items:center !important;
+  gap:4px !important;
+  line-height:28px !important;
+  flex:0 1 auto !important;
+}
+.pen-size-control input[type="range"]{
+  width:72px !important;
+  margin:0 !important;
+}
+#clearCanvas{
+  position:static !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  height:28px !important;
+  min-width:74px !important;
+  margin:0 !important;
+  padding:5px 10px !important;
+  flex:0 0 auto !important;
+  align-self:flex-start !important;
+  transform:none !important;
+}
+
+
+/* v11 그림판 상단 컨트롤 완전 한 줄 고정 */
+.draw-controls{
+  position:relative !important;
+  box-sizing:border-box !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:-44px 0 10px !important;
+  padding:0 0 0 205px !important;
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:flex-start !important;
+  gap:5px !important;
+  overflow:visible !important;
+}
+.pen-size-control{
+  box-sizing:border-box !important;
+  width:142px !important;
+  height:28px !important;
+  margin:0 !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:3px !important;
+  flex:0 0 142px !important;
+  line-height:28px !important;
+}
+.pen-size-control input[type="range"]{
+  width:70px !important;
+  min-width:70px !important;
+  margin:0 !important;
+}
+#clearCanvas{
+  position:static !important;
+  box-sizing:border-box !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:78px !important;
+  min-width:78px !important;
+  height:28px !important;
+  margin:0 !important;
+  padding:4px 7px !important;
+  flex:0 0 78px !important;
+  transform:none !important;
+  white-space:nowrap !important;
+  overflow:visible !important;
+  line-height:20px !important;
+}
+
+
+/* v12 그림판 상단: 메모장 | 그림판 | 두께 | 전체 지우기 순서 */
+.draw-controls{
+  position:relative !important;
+  box-sizing:border-box !important;
+  height:34px !important;
+  min-height:34px !important;
+  margin:-44px 0 10px !important;
+  padding:0 0 0 170px !important;
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:flex-start !important;
+  gap:12px !important;
+  overflow:visible !important;
+}
+.pen-size-control{
+  box-sizing:border-box !important;
+  width:145px !important;
+  height:28px !important;
+  margin:0 !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:4px !important;
+  flex:0 0 145px !important;
+  line-height:28px !important;
+}
+.pen-size-control input[type="range"]{
+  width:76px !important;
+  min-width:76px !important;
+  margin:0 !important;
+}
+#clearCanvas{
+  position:static !important;
+  box-sizing:border-box !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:88px !important;
+  min-width:88px !important;
+  height:28px !important;
+  margin:0 !important;
+  padding:4px 10px !important;
+  flex:0 0 88px !important;
+  white-space:nowrap !important;
+  transform:none !important;
+}
+
+
+/* v13: 실제 HTML 구조부터 하나의 상단 flex 행으로 통합 */
+.tool-header{
+  width:100%;
+  height:38px;
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:flex-start;
+  border-bottom:1px solid #e2e5e9;
+  margin:0 0 10px;
+  box-sizing:border-box;
+}
+.tool-header .tabs{
+  flex:0 0 155px;
+  height:37px !important;
+  margin:0 !important;
+  border:0 !important;
+  display:flex !important;
+  align-items:flex-start !important;
+  gap:18px !important;
+}
+.tool-header .tab{
+  height:37px !important;
+  line-height:32px !important;
+}
+.tool-header .tooltop{
+  margin:0 0 0 auto !important;
+  height:30px !important;
+  min-height:0 !important;
+  display:flex;
+  align-items:flex-start !important;
+  justify-content:flex-end !important;
+}
+.tool-header .tooltop .clear{
+  height:28px !important;
+  margin:0 !important;
+}
+.tool-header .draw-controls{
+  position:static !important;
+  flex:1 1 auto !important;
+  width:auto !important;
+  height:30px !important;
+  min-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  display:none;
+  align-items:flex-start !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  overflow:visible !important;
+}
+.tool-header .pen-size-control{
+  width:auto !important;
+  height:28px !important;
+  margin:0 !important;
+  flex:0 0 auto !important;
+  display:flex !important;
+  align-items:center !important;
+  gap:4px !important;
+  line-height:28px !important;
+}
+.tool-header .pen-size-control input[type="range"]{
+  width:72px !important;
+  min-width:72px !important;
+  margin:0 !important;
+}
+.tool-header #clearCanvas{
+  position:static !important;
+  width:auto !important;
+  min-width:82px !important;
+  height:28px !important;
+  margin:0 !important;
+  padding:4px 10px !important;
+  flex:0 0 auto !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  transform:none !important;
+  white-space:nowrap !important;
+}
+#noteWrap .tooltop,#drawWrap .draw-controls{margin:0 !important}
+body.omr-collapsed .tool-header .tabs{flex-basis:140px;gap:12px !important}
+body.omr-collapsed .tool-header .pen-size-control input[type="range"]{width:55px !important;min-width:55px !important}
+
+
+/* v14: 메모/그림판별 컨트롤이 동시에 보이는 문제 방지 */
+#noteControls{display:flex}
+#drawControls{display:none}
+
+/* 메모장일 때 전체 지우기는 우측 끝, 한 줄 안에서 정상 크기 */
+.tool-header #noteControls{
+  flex:1 1 auto !important;
+  margin:0 !important;
+  height:30px !important;
+  min-height:0 !important;
+  align-items:flex-start !important;
+  justify-content:flex-end !important;
+}
+.tool-header #noteControls #clearNote{
+  width:auto !important;
+  min-width:82px !important;
+  height:28px !important;
+  padding:4px 10px !important;
+  margin:0 !important;
+  white-space:nowrap !important;
+  line-height:20px !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+}
+
+/* 숨겨진 컨트롤은 과거 CSS의 display 규칙보다 우선 */
+#drawControls[style*="display: none"],
+#drawControls[style*="display:none"],
+#noteControls[style*="display: none"],
+#noteControls[style*="display:none"]{
+  display:none !important;
+}
+
+
+/* v15: 루트(√) 버튼 글씨 굵기 통일 */
+.key[data-v="SQRT"]{
+  font-family:Arial,"Noto Sans KR",sans-serif !important;
+  font-weight:700 !important;
+  font-size:13px !important;
+}
+
+
+/* v16: √ glyph는 font-weight만으로 굵어지지 않아 stroke로 시각적 굵기 보정 */
+.key[data-v="SQRT"]{
+  font-family:Arial,"Noto Sans KR",sans-serif !important;
+  font-weight:900 !important;
+  font-size:14px !important;
+  -webkit-text-stroke:0.45px currentColor;
+  text-shadow:0 0 0 currentColor;
+}
+
+
+/* ===== v18: 실제 SKCT 화면 참고 — 최상단 타이머 바만 Red Theme ===== */
+.timerbar{
+  background:#c63b3d !important;
+  border-color:#a92f31 !important;
+  color:#fff !important;
+}
+.timerbar .brand-logo{
+  background:#fff !important;
+  border-right-color:rgba(255,255,255,.38) !important;
+  border-radius:5px !important;
+  padding-left:4px !important;
+}
+.timerbar .timer-label{
+  color:#fff !important;
+  font-weight:700 !important;
+}
+.timerbar #timerDisplay{
+  color:#fff !important;
+  font-weight:800 !important;
+}
+.timerbar .timerbtn{
+  background:rgba(255,255,255,.96) !important;
+  color:#8f2729 !important;
+  border-color:rgba(255,255,255,.85) !important;
+  font-weight:700 !important;
+}
+.timerbar .timerbtn:hover{
+  background:#fff !important;
+}
+.timerbar #alarmMsg{
+  color:#fff !important;
+}
+
+/* 접힌 슬림 모드에서도 동일한 상단 테마만 유지 */
+body.omr-collapsed .timerbar{
+  background:#c63b3d !important;
+  border-color:#a92f31 !important;
+}
+
+
+/* v20 compact OMR:
+   OMR 내부 디자인은 그대로 두고 바깥 카드 높이만 줄여
+   오른쪽 메모/그림판 + 계산기 카드와 하단을 맞춤 */
+.omr{
+  height:690px !important;
+}
+
+
+/* v21: 오른쪽 도구 카드보다 OMR이 아주 살짝 더 길게 끝나도록 미세 조정 */
+.omr{
+  height:715px !important;
+}
+
+
+/* v22: OMR을 조금 더 길게 — 오른쪽 카드 아래 여백에 이메일이 자연스럽게 보이도록 */
+.omr{
+  height:730px !important;
+}
+
+
+
+/* ===== v24 true-fit responsive =====
+   transform이 아니라 zoom을 사용해 '보이는 크기'뿐 아니라
+   실제 레이아웃 점유 크기까지 함께 줄인다. */
+@media (max-height: 850px) and (min-width:721px){
+  body:not(.omr-collapsed){
+    zoom:.90;
+  }
+}
+@media (max-height: 760px) and (min-width:721px){
+  body:not(.omr-collapsed){
+    zoom:.82;
+  }
+}
+@media (max-height: 680px) and (min-width:721px){
+  body:not(.omr-collapsed){
+    zoom:.74;
+  }
+}
+@media (max-height: 600px) and (min-width:721px){
+  body:not(.omr-collapsed){
+    zoom:.66;
+  }
+}
+
+/* zoom 적용 시 가운데 정렬과 문서 흐름 유지 */
+html,body{
+  min-height:100%;
+}
+
+
+/* ===== v25: drawing header fit fix =====
+   좁은 창에서도 전체 지우기 버튼이 잘리지 않도록 펜 두께 UI를 숨기고
+   그림판 컨트롤 영역을 남은 폭 안에서 우측 정렬한다. */
+#drawControls .pen-size-control{
+  display:none !important;
+}
+.tool-header #drawControls{
+  flex:1 1 0 !important;
+  min-width:0 !important;
+  justify-content:flex-end !important;
+  overflow:hidden !important;
+}
+.tool-header #clearCanvas{
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:82px !important;
+  max-width:100% !important;
+  padding:4px 10px !important;
+}
+/* 오른쪽 패널이 줄어들 때 탭 영역도 약간 유연하게 */
+.tool-header .tabs{
+  flex:0 1 155px !important;
+  min-width:125px !important;
+}
+body.omr-collapsed .tool-header .tabs{
+  flex-basis:140px !important;
+}
+</style>
+</head>
+<body>
+
+<div style="width:max-content;margin:10px auto 0;padding:0 8px">
+  <div class="timerbar">
+    <span class="brand-logo" title="SK"><img src="data:image/png;base64,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" alt="SK"></span>
+    <span class="timer-label">15분 타이머</span>
+    <span id="timerDisplay">15:00</span>
+    <button class="timerbtn" id="timerStart">🚀 시험 시작</button>
+    <button class="timerbtn" id="timerPause">일시정지</button>
+    <button class="timerbtn" id="timerReset">리셋</button>
+    <button class="timerbtn" id="slimShowOMR">👀 OMR 보이기</button>
+    <span id="alarmMsg">⏰ 시간 종료!</span>
+  </div>
+</div>
+<button id="showOMRFloating" style="display:none;position:fixed;left:8px;bottom:8px;z-index:9998;padding:8px 10px;font-weight:700;background:#fff;border:1px solid #111;border-radius:8px">👀 OMR 보이기</button>
+<div class="app">
+  <section class="card omr">
+    <div class="omr-head">
+  <h1 id="omrTitle">언어이해 · 20문제</h1>
+  <div class="omr-head-actions">
+    <button class="reset area-reset" id="reset"><span>현재 영역</span><span>Reset</span></button>
+    <button class="reset omr-hide-btn" id="toggleOMR">OMR 숨기기</button>
+  </div>
+</div>
+    <div class="subject-tabs" id="subjectTabs"></div>
+    <div id="sheet"></div>
+    <div class="submit-wrap">
+      <button class="submit-btn" id="submitAnswers">제출</button>
+      <button class="cancel-grade-btn" id="cancelGrade" style="display:none">채점 취소</button>
+    </div>
+    <div id="gradeResult"></div>
+    <div class="omr-foot">
+      표시한 답안: <b><span id="count">0</span> / 20</b>
+      <div id="answers">아직 선택한 답이 없습니다.</div>
+    </div>
+  </section>
+
+  <section class="tools">
+    <div class="card toolbox">
+      <div class="tool-header">
+        <div class="tabs">
+          <button class="tab active" id="noteTab">메모장</button>
+          <button class="tab" id="drawTab">그림판</button>
+        </div>
+        <div class="tooltop" id="noteControls"><button class="clear" id="clearNote">전체 지우기</button></div>
+        <div class="draw-controls" id="drawControls">
+          <label class="pen-size-control">두께 <input id="penSize" type="range" min="1" max="15" value="2"> <span id="sizeText">2px</span></label>
+          <button class="clear" id="clearCanvas">전체 지우기</button>
+        </div>
+      </div>
+      <div id="noteWrap">
+        <textarea id="note" placeholder="메모를 입력하세요..."></textarea>
+      </div>
+      <div id="drawWrap">
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
+
+    <div class="card calc">
+      <div class="calc-title">계산기</div>
+      <div class="calc-history" id="calcHistory"><div class="history-empty">최근 계산 기록</div></div>
+      <input id="display" value="0" readonly tabindex="0" aria-label="계산기 입력창">
+      <div class="keys">
+        <button class="key" data-v="AC">C</button><button class="key" data-v="BACK">⌫</button><button class="key" data-v="/">÷</button><button class="key" data-v="SQRT">√</button>
+        <button class="key" data-v="7">7</button><button class="key" data-v="8">8</button><button class="key" data-v="9">9</button><button class="key" data-v="*">×</button>
+        <button class="key" data-v="4">4</button><button class="key" data-v="5">5</button><button class="key" data-v="6">6</button><button class="key" data-v="-">-</button>
+        <button class="key" data-v="1">1</button><button class="key" data-v="2">2</button><button class="key" data-v="3">3</button><button class="key" data-v="+">+</button>
+        <button class="key" data-v="0">0</button><button class="key" data-v="00">00</button><button class="key" data-v=".">.</button><button class="key equal-key" data-v="=">=</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="answer-modal" id="answerModal">
+  <div class="answer-panel">
+    <div class="answer-head">
+      <h2 id="answerModalTitle">정답 입력 · 언어이해</h2>
+      <button id="closeAnswerModal">닫기</button>
+    </div>
+    <div class="answer-subject-tabs" id="answerSubjectTabs"></div>
+    <div id="answerSheet"></div>
+    <div class="answer-modal-foot">
+      <div class="answer-status" id="answerStatus">실제 정답을 체크하세요.</div>
+      <div class="answer-actions">
+        <button id="clearAnswerSubject">현재 영역 Reset</button>
+        <button id="gradeFromModal">정답 제출 및 채점</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// OMR 표시/숨기기
+const omrSection = document.querySelector('.omr');
+const toggleOMRBtn = document.getElementById('toggleOMR');
+let omrHidden = false;
+
+toggleOMRBtn.onclick = () => {
+  omrHidden = true;
+  omrSection.style.display = 'none';
+  document.body.classList.add('omr-collapsed');
+  document.getElementById('slimShowOMR').textContent = 'OMR';
+  document.getElementById('showOMRFloating').style.display = 'none';
+};
+function restoreOMR(){
+  omrHidden = false;
+  omrSection.style.display = 'flex';
+  document.body.classList.remove('omr-collapsed');
+  document.getElementById('showOMRFloating').style.display = 'none';
+}
+document.getElementById('showOMRFloating').onclick = restoreOMR;
+document.getElementById('slimShowOMR').onclick = restoreOMR;
+
+
+// OMR - 5개 영역별 20문제 답안 독립 저장 + 제출 후 정답 OMR 입력/채점
+const N=20;
+const subjects=['언어이해','자료해석','창의수리','언어추리','수열추리'];
+const subjectAnswers=Object.fromEntries(subjects.map(name=>[name,Array(N).fill(null)]));
+const submittedAnswers=Object.fromEntries(subjects.map(name=>[name,Array(N).fill(null)]));
+const answerKeys=Object.fromEntries(subjects.map(name=>[name,Array(N).fill(null)]));
+let activeSubject=subjects[0], answers=subjectAnswers[activeSubject], current=0;
+let mode='solve'; // solve -> key -> graded
+const sheet=document.getElementById('sheet'), count=document.getElementById('count'), answerBox=document.getElementById('answers');
+const subjectTabs=document.getElementById('subjectTabs'), omrTitle=document.getElementById('omrTitle');
+const submitBtn=document.getElementById('submitAnswers'), cancelGradeBtn=document.getElementById('cancelGrade');
+const gradeResult=document.getElementById('gradeResult');
+
+subjects.forEach((name,idx)=>{
+ const b=document.createElement('button'); b.className='subject-tab'+(idx===0?' active':''); b.textContent=name;
+ b.onclick=()=>switchSubject(name,b); subjectTabs.appendChild(b);
+});
+for(let i=0;i<N;i++){
+ const row=document.createElement('div'); row.className='row';
+ row.innerHTML='<div class="num">'+(i+1)+'</div>';
+ for(let c=1;c<=5;c++){const b=document.createElement('button');b.className='choice';b.textContent=c;b.onclick=()=>select(i,c);row.appendChild(b)}
+ sheet.appendChild(row)
+}
+
+function getActiveArray(){
+ if(mode==='solve') return subjectAnswers[activeSubject];
+ return answerKeys[activeSubject];
+}
+function switchSubject(name,button){
+ activeSubject=name; answers=getActiveArray(); current=0;
+ document.querySelectorAll('.subject-tab').forEach(b=>b.classList.toggle('active',b===button));
+ updateTitle(); renderSelections(); updateOMR(); renderGradeMarks();
+ // 과목을 바꾸면 OMR을 항상 1번 문제 위치로
+ requestAnimationFrame(()=>{ sheet.scrollTop=0; });
+}
+function updateTitle(){
+ if(mode==='solve') omrTitle.textContent=activeSubject+' · 20문제';
+ else if(mode==='key') omrTitle.textContent=activeSubject+' · 정답 입력';
+ else omrTitle.textContent=activeSubject+' · 채점 결과';
+}
+function renderSelections(){
+ answers=getActiveArray();
+ [...sheet.children].forEach((row,q)=>row.querySelectorAll('.choice').forEach((b,i)=>{
+   b.classList.toggle('selected',answers[q]===i+1);
+   b.classList.remove('answer-key');
+ }));
+}
+function select(q,c){
+ if(mode==='graded') return;
+ answers=getActiveArray();
+ const sameChoice=answers[q]===c; answers[q]=sameChoice?null:c;
+ [...sheet.children[q].querySelectorAll('.choice')].forEach((b,i)=>b.classList.toggle('selected',!sameChoice&&i+1===c));
+ current=sameChoice?q:Math.min(q+1,N-1); updateOMR();
+}
+function updateOMR(){
+ answers=getActiveArray();
+ count.textContent=answers.filter(Boolean).length;
+ const p=answers.map((a,i)=>a?`${i+1}번 ${a}`:null).filter(Boolean);
+ if(mode==='solve') answerBox.textContent=p.length?p.join(' · '):'아직 선택한 답이 없습니다.';
+ else if(mode==='key') answerBox.textContent=p.length?'정답 입력: '+p.join(' · '):'정답을 OMR 방식으로 체크하세요.';
+ else answerBox.textContent='초록 테두리: 정답 · 빨강: 오답 · 노랑: 미응답';
+}
+function allFilled(obj){
+ return subjects.every(s=>obj[s].every(Boolean));
+}
+function missingSummary(obj){
+ return subjects.map(s=>{
+   const miss=obj[s].map((v,i)=>v?null:i+1).filter(Boolean);
+   return miss.length ? `${s}: ${miss.join(', ')}번` : null;
+ }).filter(Boolean).join('\n');
+}
+function enterKeyMode(){
+ // 체크하지 않은 공란도 그대로 제출하며, 채점 시 오답으로 처리
+ subjects.forEach(s=>submittedAnswers[s]=subjectAnswers[s].slice());
+ mode='key';
+ gradeResult.style.display='none';
+ openAnswerModal(activeSubject);
+}
+function grade(){
+ if(!allFilled(answerKeys)){
+   alert('정답을 모두 입력해야 채점할 수 있습니다.\n\n'+missingSummary(answerKeys));
+   return;
+ }
+ document.getElementById('answerModal').classList.remove('open');
+ mode='graded'; answers=subjectAnswers[activeSubject];
+ submitBtn.textContent='처음부터 다시';
+ cancelGradeBtn.style.display='none';
+ updateTitle(); renderSelections(); updateOMR(); renderGradeMarks(); showGradeResult();
+}
+function clearGradeMarks(){
+ [...sheet.children].forEach(row=>row.classList.remove('correct','wrong','unanswered'));
+ sheet.querySelectorAll('.choice').forEach(b=>b.classList.remove('answer-key'));
+}
+function renderGradeMarks(){
+ clearGradeMarks();
+ if(mode!=='graded') return;
+ const mine=submittedAnswers[activeSubject], key=answerKeys[activeSubject];
+ [...sheet.children].forEach((row,q)=>{
+   if(!mine[q]) row.classList.add('unanswered');
+   else if(mine[q]===key[q]) row.classList.add('correct');
+   else row.classList.add('wrong');
+   if(key[q]) row.querySelectorAll('.choice')[key[q]-1].classList.add('answer-key');
+ });
+}
+function showGradeResult(){
+ let totalCorrect=0, total=subjects.length*N;
+ let parts=[];
+ subjects.forEach(s=>{
+   const wrong=[];
+   let correct=0;
+   for(let i=0;i<N;i++){
+     if(submittedAnswers[s][i]===answerKeys[s][i]) correct++;
+     else wrong.push(`${i+1}번(${submittedAnswers[s][i]??'-'}→${answerKeys[s][i]})`);
+   }
+   totalCorrect+=correct;
+   parts.push(`<div><strong>${s}</strong>: ${correct}/20 · 틀린 문제 ${wrong.length?wrong.join(', '):'없음'}</div>`);
+ });
+ gradeResult.innerHTML=`<div class="grading-title">채점 결과: <b>${totalCorrect}/${total}</b></div>
+ <div class="grading-help">괄호는 내 답 → 정답입니다.</div>${parts.join('')}`;
+ gradeResult.style.display='block';
+}
+function resetAll(){
+ subjects.forEach(s=>{subjectAnswers[s].fill(null);submittedAnswers[s].fill(null);answerKeys[s].fill(null)});
+ mode='solve'; current=0; answers=subjectAnswers[activeSubject];
+ submitBtn.textContent='제출'; cancelGradeBtn.style.display='none'; gradeResult.style.display='none';
+ updateTitle(); renderSelections(); updateOMR(); clearGradeMarks();
+}
+submitBtn.onclick=()=>{ if(mode==='solve') enterKeyMode(); else if(mode==='graded') resetAll(); };
+cancelGradeBtn.onclick=()=>{
+ mode='solve'; answers=subjectAnswers[activeSubject]; current=0;
+ submitBtn.textContent='제출'; cancelGradeBtn.style.display='none'; gradeResult.style.display='none';
+ updateTitle(); renderSelections(); updateOMR(); clearGradeMarks();
+};
+document.getElementById('reset').onclick=()=>{
+ if(mode==='graded') return;
+ answers=getActiveArray(); answers.fill(null); renderSelections(); current=0; updateOMR();
+};
+
+
+// 제출 후 별도 정답 OMR 창
+const answerModal=document.getElementById('answerModal');
+const answerSheet=document.getElementById('answerSheet');
+const answerSubjectTabs=document.getElementById('answerSubjectTabs');
+const answerModalTitle=document.getElementById('answerModalTitle');
+const answerStatus=document.getElementById('answerStatus');
+let answerActiveSubject=subjects[0];
+let answerCurrent=0;
+
+subjects.forEach((name,idx)=>{
+  const b=document.createElement('button');
+  b.className='answer-subject-tab'+(idx===0?' active':'');
+  b.textContent=name;
+  b.onclick=()=>switchAnswerSubject(name,b);
+  answerSubjectTabs.appendChild(b);
+});
+for(let i=0;i<N;i++){
+  const row=document.createElement('div'); row.className='answer-row';
+  row.innerHTML='<div class="num">'+(i+1)+'</div>';
+  for(let c=1;c<=5;c++){
+    const b=document.createElement('button');
+    b.className='answer-choice'; b.textContent=c;
+    b.onclick=()=>selectAnswerKey(i,c);
+    row.appendChild(b);
+  }
+  answerSheet.appendChild(row);
+}
+function openAnswerModal(subject){
+  answerActiveSubject=subject||subjects[0];
+  answerCurrent=0;
+  document.querySelectorAll('.answer-subject-tab').forEach(b=>b.classList.toggle('active',b.textContent===answerActiveSubject));
+  renderAnswerKey();
+  answerModal.classList.add('open');
+}
+function switchAnswerSubject(name,button){
+  answerActiveSubject=name; answerCurrent=0;
+  document.querySelectorAll('.answer-subject-tab').forEach(b=>b.classList.toggle('active',b===button));
+  renderAnswerKey();
+  // 정답 입력 과목을 바꾸면 항상 1번 문제 위치로
+  requestAnimationFrame(()=>{ answerSheet.scrollTop=0; });
+}
+function selectAnswerKey(q,c){
+  const arr=answerKeys[answerActiveSubject];
+  const same=arr[q]===c;
+  arr[q]=same?null:c;
+  answerCurrent=same?q:Math.min(q+1,N-1);
+  renderAnswerKey();
+}
+function renderAnswerKey(){
+  const arr=answerKeys[answerActiveSubject];
+  answerModalTitle.textContent='정답 입력 · '+answerActiveSubject;
+  [...answerSheet.children].forEach((row,q)=>{
+    row.querySelectorAll('.answer-choice').forEach((b,i)=>b.classList.toggle('selected',arr[q]===i+1));
+  });
+  const done=arr.filter(Boolean).length;
+  answerStatus.textContent=`${answerActiveSubject} 정답: ${done} / 20 · 전체 정답을 입력한 뒤 채점하세요.`;
+}
+document.getElementById('clearAnswerSubject').onclick=()=>{
+  answerKeys[answerActiveSubject].fill(null); answerCurrent=0; renderAnswerKey();
+};
+document.getElementById('closeAnswerModal').onclick=()=>{
+  answerModal.classList.remove('open');
+  mode='solve';
+};
+document.getElementById('gradeFromModal').onclick=grade;
+
+// 정답 창이 열려 있을 때 1~5 키는 정답 OMR에 입력
+document.addEventListener('keydown',e=>{
+  if(!answerModal.classList.contains('open')) return;
+  if(/^[1-5]$/.test(e.key)){
+    e.preventDefault(); e.stopImmediatePropagation();
+    selectAnswerKey(answerCurrent,+e.key);
+  }
+}, true);
+
+// 키보드 1~5는 메모장/계산기 입력 중에는 OMR 작동 안 함
+document.addEventListener('keydown',e=>{
+ if(document.activeElement===document.getElementById('note')) return;
+ if(document.activeElement===document.getElementById('display') || document.activeElement?.closest?.('.calc')) return;
+ if(mode==='solve' && /^[1-5]$/.test(e.key)) select(current,+e.key);
+});
+
+// 메모장/그림판 탭
+const noteTab=document.getElementById('noteTab'),drawTab=document.getElementById('drawTab');
+const noteWrap=document.getElementById('noteWrap'),drawWrap=document.getElementById('drawWrap');
+const noteControls=document.getElementById('noteControls'),drawControls=document.getElementById('drawControls');
+noteTab.onclick=()=>{noteTab.classList.add('active');drawTab.classList.remove('active');noteWrap.style.display='block';drawWrap.style.display='none';noteControls.style.display='flex';drawControls.style.display='none'};
+drawTab.onclick=()=>{drawTab.classList.add('active');noteTab.classList.remove('active');drawWrap.style.display='block';noteWrap.style.display='none';noteControls.style.display='none';drawControls.style.display='flex';resizeCanvas()};
+document.getElementById('clearNote').onclick=()=>document.getElementById('note').value='';
+
+// 그림판
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d'),size=document.getElementById('penSize');
+let drawing=false,last=null;
+function resizeCanvas(){
+ const r=canvas.getBoundingClientRect();
+ const newW=Math.max(1,Math.round(r.width*devicePixelRatio));
+ const newH=Math.max(1,Math.round(r.height*devicePixelRatio));
+ if(canvas.width===newW && canvas.height===newH) return;
+ const old=document.createElement('canvas');
+ old.width=canvas.width; old.height=canvas.height;
+ old.getContext('2d').drawImage(canvas,0,0);
+ canvas.width=newW; canvas.height=newH;
+ ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+ ctx.lineCap='round'; ctx.lineJoin='round';
+ if(old.width && old.height){
+   ctx.save();
+   ctx.setTransform(1,0,0,1,0,0);
+   ctx.drawImage(old,0,0,old.width,old.height,0,0,newW,newH);
+   ctx.restore();
+ }
+}
+function pos(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+canvas.addEventListener('pointerdown',e=>{drawing=true;last=pos(e);canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(!drawing)return;const p=pos(e);ctx.strokeStyle='#111';ctx.lineWidth=+size.value;ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p});
+canvas.addEventListener('pointerup',()=>drawing=false);canvas.addEventListener('pointercancel',()=>drawing=false);
+size.oninput=()=>document.getElementById('sizeText').textContent=size.value+'px';
+document.getElementById('clearCanvas').onclick=()=>ctx.clearRect(0,0,canvas.width,canvas.height);
+// 초기 상태: 메모장 컨트롤만 표시
+noteControls.style.display='flex';
+drawControls.style.display='none';
+
+
+// 계산기
+const display=document.getElementById('display'); let expr='';
+const calcHistoryEl=document.getElementById('calcHistory');
+let calcHistory=[];
+function renderCalcHistory(){
+ if(!calcHistory.length){calcHistoryEl.innerHTML='<div class="history-empty">최근 계산 기록</div>';return}
+ calcHistoryEl.innerHTML=calcHistory.slice(-3).map(h=>'<div class="history-row"><span>'+h.expression+'</span><strong>'+h.result+'</strong></div>').join('');
+}
+renderCalcHistory();
+function render(){display.value=expr||'0'}
+
+function calcInput(v){
+ if(v==='AC'){expr='';render();return}
+ if(v==='C' || v==='BACK'){expr=expr.slice(0,-1);render();return}
+ if(v==='SQRT'){try{const n=Number(Function('"use strict";return ('+(expr||'0')+')')());if(n<0||!Number.isFinite(n))throw 0;expr=String(Math.sqrt(n));}catch{expr='오류'}render();return}
+ if(v==='±'){if(expr) expr=expr.startsWith('-')?expr.slice(1):'-('+expr+')';render();return}
+ if(v==='='){
+   const original=expr;
+   try{
+     const safe=expr.replace(/%/g,'/100');
+     if(!/^[0-9+\-*/().\s]+$/.test(safe)) throw 0;
+     expr=String(Function('"use strict";return ('+safe+')')());
+     if(expr==='Infinity'||expr==='NaN') throw 0;
+     if(original){
+       calcHistory.push({expression:original.replace(/\*/g,'×').replace(/\//g,'÷'),result:expr});
+       if(calcHistory.length>3) calcHistory=calcHistory.slice(-3);
+       renderCalcHistory();
+     }
+   }catch{expr='오류'}
+   render();return
+ }
+ if(expr==='오류') expr='';
+ expr+=v;render();
+}
+
+document.querySelectorAll('.key').forEach(k=>k.onclick=()=>{
+ display.focus();
+ calcInput(k.dataset.v);
+});
+
+// 계산기 영역을 클릭하면 키보드 입력을 계산기로 전환
+document.querySelector('.calc').addEventListener('mousedown',()=>{
+ setTimeout(()=>display.focus(),0);
+});
+
+// 일반 숫자키 + 오른쪽 번호키(Numpad) 지원
+document.addEventListener('keydown',e=>{
+ const calcActive = document.activeElement===display || document.activeElement?.closest?.('.calc');
+ if(!calcActive) return;
+
+ let v=null;
+ if(/^\d$/.test(e.key)) v=e.key;
+ else if(/^Numpad\d$/.test(e.code)) v=e.code.replace('Numpad','');
+ else if(e.key==='+' || e.code==='NumpadAdd') v='+';
+ else if(e.key==='-' || e.code==='NumpadSubtract') v='-';
+ else if(e.key==='*' || e.code==='NumpadMultiply') v='*';
+ else if(e.key==='/' || e.code==='NumpadDivide') v='/';
+ else if(e.key==='.' || e.code==='NumpadDecimal') v='.';
+ else if(e.key==='%') v='%';
+ else if(e.key==='(' || e.key===')') v=e.key;
+ else if(e.key==='Enter' || e.code==='NumpadEnter' || e.key==='=') v='=';
+ else if(e.key==='Backspace' || e.key==='Delete') v='C';
+ else if(e.key==='Escape') v='AC';
+
+ if(v!==null){
+   e.preventDefault();
+   e.stopImmediatePropagation();
+   calcInput(v);
+ }
+}, true);
+
+
+// 15분 타이머 + Web Audio 알람
+let timerRemaining = 15 * 60;
+let timerRunning = false;
+let timerEnd = null;
+let timerInterval = null;
+let timerPhase = 'work'; // work: 15분 영역, break: 1분 쉬는시간
+let completedWorkSessions = 0; // 완료된 15분 영역 수
+
+const timerDisplay = document.getElementById('timerDisplay');
+const alarmMsg = document.getElementById('alarmMsg');
+
+function drawTimer(){
+  const m = Math.floor(timerRemaining / 60);
+  const s = timerRemaining % 60;
+  timerDisplay.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+function stopTimerLoop(){
+  if(timerInterval){ clearInterval(timerInterval); timerInterval = null; }
+}
+function soundAlarm(){
+  alarmMsg.style.display = 'inline';
+  try{
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ac = new AudioCtx();
+    const now = ac.currentTime;
+    // 6회의 짧은 비프음
+    for(let i=0;i<6;i++){
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = (i % 2 === 0) ? 880 : 660;
+      gain.gain.setValueAtTime(0.0001, now + i*0.32);
+      gain.gain.exponentialRampToValueAtTime(0.28, now + i*0.32 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i*0.32 + 0.22);
+      osc.connect(gain); gain.connect(ac.destination);
+      osc.start(now + i*0.32); osc.stop(now + i*0.32 + 0.24);
+    }
+  }catch(e){
+    alert(timerPhase === 'work' ? '15분이 끝났습니다!' : '쉬는시간 1분이 끝났습니다!');
+  }
+}
+function tickTimer(){
+  if(!timerRunning) return;
+  timerRemaining = Math.max(0, Math.ceil((timerEnd - Date.now())/1000));
+  drawTimer();
+  if(timerRemaining <= 0){
+    timerRunning = false;
+    stopTimerLoop();
+    soundAlarm();
+
+    // 1~4번째 영역 뒤에는 1분 휴식, 5번째(수열추리) 종료 후에는 시험 종료
+    if(timerPhase === 'work'){
+      completedWorkSessions++;
+      if(completedWorkSessions >= 5){
+        timerRemaining = 0;
+        document.querySelector('.timer-label').textContent = '시험 종료';
+        drawTimer();
+        return;
+      }
+      timerPhase = 'break';
+      timerRemaining = 60;
+      document.querySelector('.timer-label').textContent = '쉬는시간 1분';
+    } else {
+      timerPhase = 'work';
+      timerRemaining = 15 * 60;
+      document.querySelector('.timer-label').textContent = '15분 타이머';
+    }
+
+    drawTimer();
+    setTimeout(() => {
+      alarmMsg.style.display = 'none';
+      timerRunning = true;
+      timerEnd = Date.now() + timerRemaining * 1000;
+      timerInterval = setInterval(tickTimer, 200);
+      tickTimer();
+    }, 0);
+  }
+}
+document.getElementById('timerStart').onclick = () => {
+  if(timerRunning || timerRemaining <= 0) return;
+  alarmMsg.style.display = 'none';
+  timerRunning = true;
+  timerEnd = Date.now() + timerRemaining*1000;
+  stopTimerLoop();
+  timerInterval = setInterval(tickTimer, 200);
+  tickTimer();
+};
+document.getElementById('timerPause').onclick = () => {
+  if(!timerRunning) return;
+  timerRemaining = Math.max(0, Math.ceil((timerEnd - Date.now())/1000));
+  timerRunning = false;
+  stopTimerLoop();
+  drawTimer();
+};
+document.getElementById('timerReset').onclick = () => {
+  timerRunning = false;
+  stopTimerLoop();
+  timerPhase = 'work';
+  completedWorkSessions = 0;
+  timerRemaining = 15*60;
+  document.querySelector('.timer-label').textContent = '15분 타이머';
+  alarmMsg.style.display = 'none';
+  drawTimer();
+};
+drawTimer();
+
+</script>
+  <div class="creator-email">leesion398@gmail.com</div>
+</body>
+</html>
