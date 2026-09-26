@@ -61,6 +61,7 @@ button{font:inherit;cursor:pointer;background:#fff;border:1px solid #111;border-
 .submit-wrap{padding:8px 10px;border-top:1px solid #ddd;display:flex;gap:7px}
 .submit-btn{flex:1;padding:9px 6px;font-weight:700;background:#171717;color:#fff}
 .cancel-grade-btn{padding:9px 8px}
+.key-entry-btn{padding:9px 8px;font-weight:700;white-space:nowrap}
 .grading-title{font-size:13px;font-weight:700;margin:0 0 6px}
 .grading-help{font-size:11px;color:#555;margin-bottom:5px}
 .row.correct{outline:2px solid #17823b;background:#eefaf1}
@@ -917,6 +918,42 @@ body.omr-collapsed .tool-header .pen-size-control input[type="range"]{width:55px
   color:#fff !important;
 }
 
+
+/* ===== 분석표 ===== */
+body.omr-collapsed #openHistory{display:none !important}
+.history-modal{position:fixed;inset:0;background:#0008;z-index:10000;display:none;align-items:center;justify-content:center;padding:12px}
+.history-modal.open{display:flex}
+.history-panel{width:min(96vw,900px);max-height:94vh;background:#fff;border:1px solid #111;border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+.history-head{padding:12px 14px;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#c63b3d;color:#fff}
+.history-head h2{font-size:17px;margin:0}
+.history-head button{padding:6px 12px;font-weight:700}
+.history-body{padding:12px 14px;overflow-y:auto}
+.history-filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;font-size:13px}
+.history-filters select{height:32px;padding:0 8px;border:1px solid #111;border-radius:6px;font:inherit;font-weight:700;background:#fff}
+.history-filters .spacer{flex:1}
+.history-filters button{height:32px;padding:0 10px;font-size:12px;font-weight:700}
+.history-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.history-card{border:1px solid #ddd;border-radius:10px;padding:8px 10px}
+.history-card .label{font-size:11px;color:#666}
+.history-card .value{font-size:22px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.history-card .value small{font-size:12px;color:#888;font-weight:700}
+.history-section-title{font-size:13px;font-weight:800;margin:14px 0 6px}
+.history-bars{display:grid;grid-template-columns:70px 1fr 64px;gap:5px 8px;align-items:center;font-size:12px}
+.history-bars .track{height:14px;background:#f1f1f1;border-radius:7px;overflow:hidden}
+.history-bars .fill{height:100%;background:#c63b3d;border-radius:7px}
+.history-bars .fill.weak{background:#e39a2d}
+.history-bars .num{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+#historyChart{width:100%;height:auto;display:block;border:1px solid #eee;border-radius:10px}
+.history-table-wrap{overflow-x:auto}
+.history-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+.history-table th,.history-table td{border-bottom:1px solid #eee;padding:6px 6px;text-align:center}
+.history-table th{background:#f7f7f7;font-weight:800}
+.history-table td.total{font-weight:800}
+.history-table .del{padding:2px 7px;font-size:11px}
+.history-table tr.best td{background:#fff5f5}
+.history-empty-msg{padding:30px 0;text-align:center;color:#888;font-size:13px}
+@media(max-width:600px){.history-cards{grid-template-columns:repeat(2,1fr)}}
+
 /* 회차 선택 */
 #roundSelect{
   height:34px;padding:0 8px;border-radius:6px;border:1px solid rgba(255,255,255,.85);
@@ -1022,6 +1059,7 @@ body.omr-collapsed .tool-header .tabs{
     <button class="timerbtn" id="timerStart">🚀 시험 시작</button>
     <button class="timerbtn" id="timerPause">일시정지</button>
     <button class="timerbtn" id="timerReset">리셋</button>
+    <button class="timerbtn" id="openHistory">📊 분석표</button>
     <button class="timerbtn" id="slimShowOMR">👀 OMR 보이기</button>
     <span id="alarmMsg">⏰ 시간 종료!</span>
   </div>
@@ -1041,6 +1079,7 @@ body.omr-collapsed .tool-header .tabs{
     <div class="submit-wrap">
       <button class="submit-btn" id="submitAnswers">제출</button>
       <button class="cancel-grade-btn" id="cancelGrade" style="display:none">채점 취소</button>
+      <button class="key-entry-btn" id="openKeyEntry" style="display:none">✏️ 정답 입력</button>
     </div>
     <div id="gradeResult"></div>
     <div class="omr-foot">
@@ -1083,6 +1122,26 @@ body.omr-collapsed .tool-header .tabs{
       </div>
     </div>
   </section>
+</div>
+
+
+<div class="history-modal" id="historyModal">
+  <div class="history-panel">
+    <div class="history-head">
+      <h2>📊 점수 분석표</h2>
+      <button id="closeHistory">닫기</button>
+    </div>
+    <div class="history-body">
+      <div class="history-filters">
+        회차 <select id="historyRound"></select>
+        그래프 <select id="historyMetric"></select>
+        <span class="spacer"></span>
+        <button id="exportHistory">CSV 저장</button>
+        <button id="clearHistory">기록 전체 삭제</button>
+      </div>
+      <div id="historyContent"></div>
+    </div>
+  </div>
 </div>
 
 <div class="answer-modal" id="answerModal">
@@ -1130,7 +1189,9 @@ document.getElementById('slimShowOMR').onclick = restoreOMR;
 const N=20;
 const subjects=['언어이해','자료해석','창의수리','언어추리','수열추리'];
 // 모의고사 회차(1~10회차)마다 내 답안/제출 답안/정답/진행 상태를 따로 저장
-const ROUNDS=10;
+const ROUNDS=8; // 0~6: 1~7회차, 7: 일반(정답 직접 입력)
+const GENERAL=7;
+function roundLabel(r){ return r===GENERAL?'일반':(r+1)+'회차'; }
 function emptyBySubject(){ return Object.fromEntries(subjects.map(name=>[name,Array(N).fill(null)])); }
 const rounds=Array.from({length:ROUNDS},()=>({
  subjectAnswers:emptyBySubject(), submittedAnswers:emptyBySubject(), answerKeys:emptyBySubject(), mode:'solve'
@@ -1204,8 +1265,12 @@ function select(q,c){
  const sameChoice=answers[q]===c; answers[q]=sameChoice?null:c;
  [...sheet.children[q].querySelectorAll('.choice')].forEach((b,i)=>b.classList.toggle('selected',!sameChoice&&i+1===c));
  current=sameChoice?q:Math.min(q+1,N-1); updateOMR();
- if(mode==='solve' && !wasFull && !sameChoice && activeSubject===subjects[subjects.length-1] && answers.every(Boolean) && presetKey(activeRound)){
-   setTimeout(()=>{ if(mode==='solve' && confirm('수열추리까지 마킹 완료! 지금 '+(activeRound+1)+'회차 채점할까요?')) autoGrade(); },50);
+ if(mode==='solve' && !wasFull && !sameChoice && activeSubject===subjects[subjects.length-1] && answers.every(Boolean)){
+   setTimeout(()=>{
+     if(mode!=='solve') return;
+     if(hasKeys()){ if(confirm('수열추리까지 마킹 완료! 지금 '+roundLabel(activeRound)+' 채점할까요?')) autoGrade(); }
+     else if(confirm('수열추리까지 마킹 완료! 정답을 입력하고 채점할까요?')) enterKeyMode();
+   },50);
  }
 }
 function updateOMR(){
@@ -1234,10 +1299,12 @@ function missingSummary(obj){
    return miss.length ? `${s}: ${miss.join(', ')}번` : null;
  }).filter(Boolean).join('\n');
 }
+// 정답표가 있는 회차이거나, 일반에서 정답을 모두 입력해 둔 경우
+function hasKeys(){ return !!presetKey(activeRound) || allFilled(answerKeys); }
 function autoGrade(){
  const preset=presetKey(activeRound);
- if(!preset) return false;
- subjects.forEach(s=>{submittedAnswers[s]=subjectAnswers[s].slice(); answerKeys[s]=preset[s];});
+ if(preset) subjects.forEach(s=>{answerKeys[s]=preset[s];});
+ if(!allFilled(answerKeys)) return false;
  grade();
  return true;
 }
@@ -1255,10 +1322,12 @@ function grade(){
    return;
  }
  document.getElementById('answerModal').classList.remove('open');
+ subjects.forEach(s=>submittedAnswers[s]=subjectAnswers[s].slice());
  mode='graded'; answers=subjectAnswers[activeSubject];
  submitBtn.textContent='처음부터 다시';
  cancelGradeBtn.style.display='none';
  updateTitle(); renderSelections(); updateOMR(); renderGradeMarks(); showGradeResult();
+ saveHistoryRecord(); updateKeyEntryBtn();
 }
 function clearGradeMarks(){
  [...sheet.children].forEach(row=>row.classList.remove('correct','wrong','unanswered'));
@@ -1288,7 +1357,7 @@ function showGradeResult(){
    totalCorrect+=correct;
    parts.push(`<div><strong>${s}</strong>: ${correct}/20 · 틀린 문제 ${wrong.length?wrong.join(', '):'없음'}</div>`);
  });
- gradeResult.innerHTML=`<div class="grading-title">${activeRound+1}회차 채점 결과: <b>${totalCorrect}/${total}</b></div>
+ gradeResult.innerHTML=`<div class="grading-title">${roundLabel(activeRound)} 채점 결과: <b>${totalCorrect}/${total}</b></div>
  <div class="grading-help">괄호는 내 답 → 정답입니다.</div>${parts.join('')}`;
  gradeResult.style.display='block';
 }
@@ -1296,14 +1365,14 @@ function resetAll(){
  subjects.forEach(s=>{subjectAnswers[s].fill(null);submittedAnswers[s].fill(null);answerKeys[s].fill(null)});
  mode='solve'; current=0; answers=subjectAnswers[activeSubject];
  submitBtn.textContent='제출'; cancelGradeBtn.style.display='none'; gradeResult.style.display='none';
- updateTitle(); renderSelections(); updateOMR(); clearGradeMarks();
+ updateTitle(); renderSelections(); updateOMR(); clearGradeMarks(); updateKeyEntryBtn();
 }
 submitBtn.onclick=()=>{ if(mode==='solve') enterKeyMode(); else if(mode==='graded') resetAll(); };
 
 // 회차 선택
 const roundSelect=document.getElementById('roundSelect');
 for(let r=0;r<ROUNDS;r++){
- const o=document.createElement('option'); o.value=r; o.textContent=(r+1)+'회차'; roundSelect.appendChild(o);
+ const o=document.createElement('option'); o.value=r; o.textContent=roundLabel(r); roundSelect.appendChild(o);
 }
 roundSelect.onchange=()=>switchRound(+roundSelect.value);
 function switchRound(r){
@@ -1315,9 +1384,17 @@ function switchRound(r){
  cancelGradeBtn.style.display='none';
  if(mode==='graded'){ submitBtn.textContent='처음부터 다시'; showGradeResult(); }
  else { submitBtn.textContent='제출'; gradeResult.style.display='none'; }
- updateTitle(); renderSelections(); updateOMR(); renderGradeMarks();
+ updateTitle(); renderSelections(); updateOMR(); renderGradeMarks(); updateKeyEntryBtn();
  requestAnimationFrame(()=>{ sheet.scrollTop=0; });
 }
+// 일반을 고르면 정답 입력 버튼이 나타남 (채점 전 미리 입력해 두면 제출/수열추리 완료 시 바로 채점)
+const keyEntryBtn=document.getElementById('openKeyEntry');
+function updateKeyEntryBtn(){
+ keyEntryBtn.style.display=(activeRound===GENERAL && mode!=='graded')?'':'none';
+ const done=subjects.reduce((n,s)=>n+answerKeys[s].filter(Boolean).length,0);
+ keyEntryBtn.textContent=done?`✏️ 정답 ${done}/${subjects.length*N}`:'✏️ 정답 입력';
+}
+keyEntryBtn.onclick=()=>openAnswerModal(activeSubject);
 cancelGradeBtn.onclick=()=>{
  mode='solve'; answers=subjectAnswers[activeSubject]; current=0;
  submitBtn.textContent='제출'; cancelGradeBtn.style.display='none'; gradeResult.style.display='none';
@@ -1328,6 +1405,122 @@ document.getElementById('reset').onclick=()=>{
  answers=getActiveArray(); answers.fill(null); renderSelections(); current=0; updateOMR();
 };
 
+
+
+// ===== 분석표: 채점할 때마다 날짜/회차/과목별 점수 기록 (브라우저에 저장) =====
+const HISTORY_KEY='skct_score_history_v1';
+function loadHistory(){ try{ return JSON.parse(localStorage.getItem(HISTORY_KEY))||[]; }catch(e){ return []; } }
+function storeHistory(list){ try{ localStorage.setItem(HISTORY_KEY,JSON.stringify(list)); }catch(e){ alert('기록 저장에 실패했습니다. (브라우저 저장소 사용 불가)'); } }
+function saveHistoryRecord(){
+ const scores={}, wrong={};
+ subjects.forEach(s=>{
+   wrong[s]=[]; let c=0;
+   for(let i=0;i<N;i++){ if(submittedAnswers[s][i]===answerKeys[s][i]) c++; else wrong[s].push(i+1); }
+   scores[s]=c;
+ });
+ const list=loadHistory();
+ list.push({id:Date.now(), date:new Date().toISOString(), round:roundLabel(activeRound), scores, wrong,
+   total:subjects.reduce((n,s)=>n+scores[s],0)});
+ storeHistory(list);
+}
+function fmtDate(iso,withTime){
+ const d=new Date(iso), p=n=>String(n).padStart(2,'0');
+ const day=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+ return withTime?`${day} ${p(d.getHours())}:${p(d.getMinutes())}`:day;
+}
+const historyModal=document.getElementById('historyModal');
+const historyRound=document.getElementById('historyRound');
+const historyMetric=document.getElementById('historyMetric');
+const historyContent=document.getElementById('historyContent');
+['전체',...Array.from({length:ROUNDS},(_,r)=>roundLabel(r))].forEach(v=>{
+ const o=document.createElement('option'); o.value=v; o.textContent=v; historyRound.appendChild(o);
+});
+['총점',...subjects].forEach(v=>{
+ const o=document.createElement('option'); o.value=v; o.textContent=v; historyMetric.appendChild(o);
+});
+historyRound.onchange=historyMetric.onchange=renderHistory;
+document.getElementById('openHistory').onclick=()=>{ renderHistory(); historyModal.classList.add('open'); };
+document.getElementById('closeHistory').onclick=()=>historyModal.classList.remove('open');
+historyModal.addEventListener('click',e=>{ if(e.target===historyModal) historyModal.classList.remove('open'); });
+document.getElementById('clearHistory').onclick=()=>{
+ if(!loadHistory().length) return;
+ if(confirm('모든 점수 기록을 삭제할까요? 되돌릴 수 없습니다.')){ storeHistory([]); renderHistory(); }
+};
+document.getElementById('exportHistory').onclick=()=>{
+ const list=loadHistory();
+ if(!list.length){ alert('저장할 기록이 없습니다.'); return; }
+ const head=['날짜','회차',...subjects,'총점',...subjects.map(s=>s+' 틀린 문제')];
+ const rows=list.map(r=>[fmtDate(r.date,true),r.round,...subjects.map(s=>r.scores[s]),r.total,...subjects.map(s=>'"'+r.wrong[s].join(' ')+'"')]);
+ const csv='﻿'+[head,...rows].map(r=>r.join(',')).join('\n');
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+ a.download='SKCT_점수기록_'+fmtDate(new Date().toISOString())+'.csv';
+ a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+function deleteHistory(id){
+ if(!confirm('이 기록을 삭제할까요?')) return;
+ storeHistory(loadHistory().filter(r=>r.id!==id)); renderHistory();
+}
+function historyChartSVG(list,metric){
+ const W=860,H=230,L=36,R=14,T=16,B=44;
+ const max=metric==='총점'?subjects.length*N:N;
+ const vals=list.map(r=>metric==='총점'?r.total:r.scores[metric]);
+ const n=vals.length;
+ const x=i=>n===1?(L+W-R)/2:L+i*(W-L-R)/(n-1);
+ const y=v=>T+(1-v/max)*(H-T-B);
+ let g='';
+ for(let k=0;k<=4;k++){
+   const v=Math.round(max*k/4), yy=y(v);
+   g+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="#eee"/><text x="${L-6}" y="${yy+4}" font-size="11" text-anchor="end" fill="#888">${v}</text>`;
+ }
+ const pts=vals.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+ let marks='';
+ const step=Math.ceil(n/12);
+ vals.forEach((v,i)=>{
+   marks+=`<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="#c63b3d"><title>${fmtDate(list[i].date,true)} · ${list[i].round} · ${v}점</title></circle>`;
+   marks+=`<text x="${x(i)}" y="${y(v)-9}" font-size="11" font-weight="700" text-anchor="middle" fill="#111">${v}</text>`;
+   if(i%step===0||i===n-1){
+     const d=new Date(list[i].date);
+     marks+=`<text x="${x(i)}" y="${H-B+16}" font-size="10" text-anchor="middle" fill="#666">${d.getMonth()+1}/${d.getDate()}</text>`;
+     marks+=`<text x="${x(i)}" y="${H-B+29}" font-size="10" text-anchor="middle" fill="#999">${list[i].round}</text>`;
+   }
+ });
+ return `<svg id="historyChart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${metric} 점수 추이">${g}
+  <polyline points="${pts}" fill="none" stroke="#c63b3d" stroke-width="2.5" stroke-linejoin="round"/>${marks}</svg>`;
+}
+function renderHistory(){
+ const all=loadHistory().sort((a,b)=>a.date<b.date?-1:1);
+ const rf=historyRound.value, metric=historyMetric.value;
+ const list=rf==='전체'?all:all.filter(r=>r.round===rf);
+ if(!list.length){
+   historyContent.innerHTML=`<div class="history-empty-msg">${all.length?'선택한 회차의 기록이 없습니다.':'아직 기록이 없습니다.<br>시험을 채점하면 여기에 자동으로 기록됩니다.'}</div>`;
+   return;
+ }
+ const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+ const totals=list.map(r=>r.total);
+ const best=Math.max(...totals), last=list[list.length-1];
+ const prev=list.length>1?list[list.length-2]:null;
+ const diff=prev?last.total-prev.total:null;
+ const cards=`<div class="history-cards">
+   <div class="history-card"><div class="label">응시 횟수</div><div class="value">${list.length}<small> 회</small></div></div>
+   <div class="history-card"><div class="label">평균 총점</div><div class="value">${avg(totals).toFixed(1)}<small> / 100</small></div></div>
+   <div class="history-card"><div class="label">최고 점수</div><div class="value">${best}<small> / 100</small></div></div>
+   <div class="history-card"><div class="label">최근 점수 (${last.round})</div><div class="value">${last.total}<small>${diff===null?'':(diff>=0?' ▲'+diff:' ▼'+(-diff))}</small></div></div>
+ </div>`;
+ const subAvg=subjects.map(s=>avg(list.map(r=>r.scores[s])));
+ const minAvg=Math.min(...subAvg);
+ const bars=`<div class="history-section-title">과목별 평균 (20점 만점 · 주황 = 가장 약한 과목)</div><div class="history-bars">`+
+   subjects.map((s,i)=>`<div>${s}</div><div class="track"><div class="fill${subAvg[i]===minAvg?' weak':''}" style="width:${subAvg[i]/N*100}%"></div></div><div class="num">${subAvg[i].toFixed(1)} / 20</div>`).join('')+`</div>`;
+ const chart=`<div class="history-section-title">${metric} 점수 추이</div>`+historyChartSVG(list,metric);
+ const rows=[...list].reverse().map(r=>`<tr class="${r.total===best?'best':''}">
+   <td>${fmtDate(r.date,true)}</td><td>${r.round}</td>
+   ${subjects.map(s=>`<td title="틀린 문제: ${r.wrong[s].length?r.wrong[s].join(', ')+'번':'없음'}">${r.scores[s]}</td>`).join('')}
+   <td class="total">${r.total}</td><td><button class="del" data-id="${r.id}">삭제</button></td></tr>`).join('');
+ const table=`<div class="history-section-title">응시 기록 (과목 점수에 마우스를 올리면 틀린 문제 번호가 보입니다)</div>
+   <div class="history-table-wrap"><table class="history-table"><thead><tr><th>날짜</th><th>회차</th>${subjects.map(s=>`<th>${s}</th>`).join('')}<th>총점</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+ historyContent.innerHTML=cards+bars+chart+table;
+ historyContent.querySelectorAll('.del').forEach(b=>b.onclick=()=>deleteHistory(+b.dataset.id));
+}
 
 // 제출 후 별도 정답 OMR 창
 const answerModal=document.getElementById('answerModal');
@@ -1391,7 +1584,7 @@ document.getElementById('clearAnswerSubject').onclick=()=>{
 };
 document.getElementById('closeAnswerModal').onclick=()=>{
   answerModal.classList.remove('open');
-  mode='solve';
+  mode='solve'; answers=getActiveArray(); renderSelections(); updateOMR(); updateKeyEntryBtn();
 };
 document.getElementById('gradeFromModal').onclick=grade;
 
@@ -1580,7 +1773,7 @@ function tickTimer(){
         timerRemaining = 0;
         document.querySelector('.timer-label').textContent = '시험 종료';
         drawTimer();
-        if(mode==='solve') autoGrade();
+        if(mode==='solve') enterKeyMode();
         return;
       }
       timerPhase = 'break';
