@@ -1136,6 +1136,23 @@ const rounds=Array.from({length:ROUNDS},()=>({
  subjectAnswers:emptyBySubject(), submittedAnswers:emptyBySubject(), answerKeys:emptyBySubject(), mode:'solve'
 }));
 let activeRound=0;
+
+// 독끝 SKCT 모의고사 정답표 (과목 순서: 언어이해, 자료해석, 창의수리, 언어추리, 수열추리)
+// 정답표가 있는 회차는 제출 시 정답 입력 없이 바로 채점
+const PRESET_KEYS={
+ 1:['23431 51412 45555 33411', '14433 44232 51223 54213', '24531 33311 11454 43443', '32445 35432 45343 35221', '32313 31445 21231 21512'],
+ 2:['21345 43544 12333 33145', '31343 23533 21234 33423', '43315 23544 22522 15554', '22234 42142 25254 41214', '32243 15431 22232 23543'],
+ 3:['34312 22542 53553 33325', '23343 41413 43452 55243', '31322 14112 34332 33212', '54314 15154 44341 32455', '32332 13424 22331 21153'],
+ 4:['41252 53435 13245 44124', '23523 23435 44543 35535', '22222 43213 31423 14133', '12133 31535 34433 42155', '34253 34432 32223 42121'],
+ 5:['44553 32445 24234 43153', '23414 35453 54125 42453', '43314 31321 42454 23534', '43241 54151 23245 32331', '43214 42533 53331 53244'],
+ 6:['25231 31433 33133 54414', '42411 35353 42144 45344', '31225 14255 44132 34212', '14433 24252 25244 11231', '53551 43413 41224 44324'],
+ 7:['14324 22424 11415 25354', '43224 53545 35532 34352', '15143 45134 32114 43354', '34424 15355 33541 14152', '22143 53455 13411 24432'],
+};
+function presetKey(r){
+ const rows=PRESET_KEYS[r+1];
+ if(!rows) return null;
+ return Object.fromEntries(subjects.map((name,i)=>[name,[...rows[i].replace(/\s/g,'')].map(Number)]));
+}
 let subjectAnswers=rounds[0].subjectAnswers;
 let submittedAnswers=rounds[0].submittedAnswers;
 let answerKeys=rounds[0].answerKeys;
@@ -1183,9 +1200,13 @@ function renderSelections(){
 function select(q,c){
  if(mode==='graded') return;
  answers=getActiveArray();
+ const wasFull=answers.every(Boolean);
  const sameChoice=answers[q]===c; answers[q]=sameChoice?null:c;
  [...sheet.children[q].querySelectorAll('.choice')].forEach((b,i)=>b.classList.toggle('selected',!sameChoice&&i+1===c));
  current=sameChoice?q:Math.min(q+1,N-1); updateOMR();
+ if(mode==='solve' && !wasFull && !sameChoice && activeSubject===subjects[subjects.length-1] && answers.every(Boolean) && presetKey(activeRound)){
+   setTimeout(()=>{ if(mode==='solve' && confirm('수열추리까지 마킹 완료! 지금 '+(activeRound+1)+'회차 채점할까요?')) autoGrade(); },50);
+ }
 }
 function updateOMR(){
  answers=getActiveArray();
@@ -1213,7 +1234,15 @@ function missingSummary(obj){
    return miss.length ? `${s}: ${miss.join(', ')}번` : null;
  }).filter(Boolean).join('\n');
 }
+function autoGrade(){
+ const preset=presetKey(activeRound);
+ if(!preset) return false;
+ subjects.forEach(s=>{submittedAnswers[s]=subjectAnswers[s].slice(); answerKeys[s]=preset[s];});
+ grade();
+ return true;
+}
 function enterKeyMode(){
+ if(autoGrade()) return;
  // 체크하지 않은 공란도 그대로 제출하며, 채점 시 오답으로 처리
  subjects.forEach(s=>submittedAnswers[s]=subjectAnswers[s].slice());
  mode='key';
@@ -1259,7 +1288,7 @@ function showGradeResult(){
    totalCorrect+=correct;
    parts.push(`<div><strong>${s}</strong>: ${correct}/20 · 틀린 문제 ${wrong.length?wrong.join(', '):'없음'}</div>`);
  });
- gradeResult.innerHTML=`<div class="grading-title">채점 결과: <b>${totalCorrect}/${total}</b></div>
+ gradeResult.innerHTML=`<div class="grading-title">${activeRound+1}회차 채점 결과: <b>${totalCorrect}/${total}</b></div>
  <div class="grading-help">괄호는 내 답 → 정답입니다.</div>${parts.join('')}`;
  gradeResult.style.display='block';
 }
@@ -1551,6 +1580,7 @@ function tickTimer(){
         timerRemaining = 0;
         document.querySelector('.timer-label').textContent = '시험 종료';
         drawTimer();
+        if(mode==='solve') autoGrade();
         return;
       }
       timerPhase = 'break';
