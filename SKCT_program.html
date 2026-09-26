@@ -24,6 +24,10 @@ button{font:inherit;cursor:pointer;background:#fff;border:1px solid #111;border-
 .choice.selected{background:#111;color:#fff;font-weight:700}
 .omr-foot{flex:0 0 auto;padding:10px;border-top:1px solid #ddd;font-size:13px}
 #answers{margin-top:7px;line-height:1.6;color:#444}
+.answer-groups{display:grid;grid-template-columns:auto auto;justify-content:start;column-gap:12px;row-gap:2px;margin-top:4px}
+.answer-groups .grp-range{color:#888;font-size:11px;align-self:center;text-align:right}
+.answer-groups .grp-digits{font-family:Consolas,"Courier New",monospace;font-size:17px;font-weight:700;letter-spacing:4px;color:#111}
+.answer-groups .grp-empty{color:#bbb}
 
 .tools{width:400px;display:flex;flex-direction:column;gap:14px}
 .toolbox{padding:12px}
@@ -1171,10 +1175,19 @@ function select(q,c){
 function updateOMR(){
  answers=getActiveArray();
  count.textContent=answers.filter(Boolean).length;
- const p=answers.map((a,i)=>a?`${i+1}번 ${a}`:null).filter(Boolean);
- if(mode==='solve') answerBox.textContent=p.length?p.join(' · '):'아직 선택한 답이 없습니다.';
- else if(mode==='key') answerBox.textContent=p.length?'정답 입력: '+p.join(' · '):'정답을 OMR 방식으로 체크하세요.';
+ const hasAny=answers.some(Boolean);
+ if(mode==='solve'){ if(hasAny) answerBox.innerHTML=groupedAnswers(answers); else answerBox.textContent='아직 선택한 답이 없습니다.'; }
+ else if(mode==='key'){ if(hasAny) answerBox.innerHTML='정답 입력'+groupedAnswers(answers); else answerBox.textContent='정답을 OMR 방식으로 체크하세요.'; }
  else answerBox.textContent='초록 테두리: 정답 · 빨강: 오답 · 노랑: 미응답';
+}
+// 체크한 답을 5문항씩 묶어 한 줄로 표시 (예: 1-5  12235), 미응답은 -
+function groupedAnswers(arr){
+ let html='<div class="answer-groups">';
+ for(let i=0;i<arr.length;i+=5){
+   const digits=arr.slice(i,i+5).map(a=>a?String(a):'<span class="grp-empty">-</span>').join('');
+   html+=`<span class="grp-range">${i+1}-${Math.min(i+5,arr.length)}</span><span class="grp-digits">${digits}</span>`;
+ }
+ return html+'</div>';
 }
 function allFilled(obj){
  return subjects.every(s=>obj[s].every(Boolean));
